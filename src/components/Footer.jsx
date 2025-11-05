@@ -32,6 +32,7 @@ const Footer = () => {
         <ul className="footer-links">
           <li><a href="#AGENCY">Agency</a></li>
           <li><a href="#profit-framework">Profit Path</a></li>
+          <li><a href="#process">Process</a></li>
           <li><a href="#approach">Approach</a></li>
           <li><a href="#contact">Contact</a></li>
         </ul>

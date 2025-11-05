@@ -8,7 +8,7 @@ import Growth from "./components/Growth";
 import Contact from "./components/Contact";
 import Footer from "./components/Footer";
 import EntranceScreen from "./components/EntranceScreen";
-
+import PremiumProcessTimelineRowsV3 from "./components/PremiumProcessTimeline";
 import Login from "./admin/Login";
 import Dashboard from "./admin/Dashboard";
 import AdminRoute from "./admin/AdminRoute";
@@ -51,6 +51,7 @@ function App() {
               <Navbar />
               <Hero />
               <About />
+              <PremiumProcessTimelineRowsV3/>
               <Growth />
               <Contact />
               <Footer />

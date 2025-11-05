@@ -6,6 +6,7 @@ import { FaBars, FaTimes } from "react-icons/fa";
   const navItems = [
     { label: "AGENCY", target: "AGENCY" },
     { label: "PROFIT PATH", target: "profit-framework" },
+    { label: "PROCESS", target: "process" },
     { label: "APPROACH", target: "approach" },
     { label: "CONTACT", target: "contact" },
   ];
@@ -23,22 +24,28 @@ const Navbar = () => {
     }
   };
 
-  useEffect(() => {
-    const onScroll = () => {
-      let current = "";
-      navItems.forEach((item) => {
-        const el = document.getElementById(item.target);
-        if (!el) return;
-        const top = el.offsetTop - 140; // navbar offset
-        const bottom = top + el.offsetHeight;
-        if (window.scrollY >= top && window.scrollY < bottom) current = item.target;
-      });
-      setActiveSection(current);
-    };
-    window.addEventListener("scroll", onScroll);
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+useEffect(() => {
+  const HEADER = 140;
+  const onScroll = () => {
+    let current = activeSection; // keep previous if nothing matches
+    for (const item of navItems) {
+      const el = document.getElementById(item.target);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const topWithin = rect.top <= HEADER + 24;
+      const bottomBeyond = rect.bottom > HEADER + 48; // lenient
+      if (topWithin && bottomBeyond) {
+        current = item.target;
+        break;
+      }
+    }
+    setActiveSection(current);
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+  return () => window.removeEventListener("scroll", onScroll);
+}, [activeSection]);
+
 
   return (
     <nav className="navbar">
