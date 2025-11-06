@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo } from "react";
-import { motion, useAnimation } from "framer-motion";
+import { motion } from "framer-motion"; // kept in case you use elsewhere; not required for cards now
 import {
   Target, Heart, Lightbulb, Globe, Zap, TrendingUp, Users, Mail,
   Sparkles, DollarSign, Clock, ArrowUpRight, LineChart, Rocket
@@ -24,13 +24,13 @@ function useMediaQuery(query) {
 function ParticleRainBackground({
   className = "",
   colors = ["#00aeef", "#a44de4"],
-  count = 1,
+  count = 36,
   speed = [12, 22],
-  size = [0.2, 0.2],
-  blur = 10,
-  opacity = 0.45,
-  wind = 1.6,
-  emit = "both"          // "top" | "bottom" | "both"
+  size = [0.45, 0.9],   // tiny sparkles
+  blur = 4,
+  opacity = 0.35,
+  wind = 1.0,
+  emit = "both"
 }) {
   const hostRef = React.useRef(null);
   const rafRef = React.useRef();
@@ -44,8 +44,7 @@ function ParticleRainBackground({
   const rand = (a,b)=> a + Math.random()*(b-a);
   const pick = (arr)=> arr[(Math.random()*arr.length)|0];
 
-  // pre-render a soft glow sprite ONCE per color (cached)
-  const makeSprite = React.useCallback((r = 2, b = 10, color = "#00aeef") => {
+  const makeSprite = React.useCallback((r = 0.6, b = 4, color = "#00aeef") => {
     const pad = Math.ceil(b * 2.2);
     const S = Math.ceil(r * 2 + pad * 2);
     const c = document.createElement("canvas");
@@ -53,7 +52,6 @@ function ParticleRainBackground({
     const ctx = c.getContext("2d");
     const cx = S / 2, cy = S / 2;
 
-    // colored radial glow
     const g = ctx.createRadialGradient(cx, cy, r * 0.25, cx, cy, Math.max(r, b) + pad / 2);
     g.addColorStop(0.0, color);
     g.addColorStop(0.35, color);
@@ -66,7 +64,6 @@ function ParticleRainBackground({
     ctx.arc(cx, cy, Math.max(r, b) + pad / 2, 0, Math.PI * 2);
     ctx.fill();
 
-    // colored core
     ctx.globalAlpha = 1;
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -107,7 +104,7 @@ function ParticleRainBackground({
       const P = [];
       for (let i = 0; i < topCount; i++) {
         P.push({
-          dir: 1, // down
+          dir: 1,
           x: Math.random()*w,
           y: rand(-h*0.25, 0),
           r: rand(size[0], size[1]),
@@ -119,7 +116,7 @@ function ParticleRainBackground({
       }
       for (let i = 0; i < bottomCount; i++) {
         P.push({
-          dir: -1, // up
+          dir: -1,
           x: Math.random()*w,
           y: rand(h, h*1.25),
           r: rand(size[0], size[1]),
@@ -131,13 +128,9 @@ function ParticleRainBackground({
       }
       particlesRef.current = P;
 
-      // build colored sprites once per color
       spriteCacheRef.current.clear();
       colors.forEach(col => {
-        spriteCacheRef.current.set(
-          col,
-          makeSprite(Math.max(1.8, (size[0] + size[1]) * 0.3), blur, col)
-        );
+        spriteCacheRef.current.set(col, makeSprite(Math.max(0.5, (size[0] + size[1]) * 0.35), blur, col));
       });
     };
 
@@ -145,11 +138,9 @@ function ParticleRainBackground({
     ro.observe(host);
     seed();
 
-    // pause when section not visible
     const io = new IntersectionObserver(([e]) => { visibleRef.current = !!e.isIntersecting; }, { threshold: 0.01 });
     io.observe(host);
 
-    // lower fps when tab not focused
     const onVis = () => { fpsTargetRef.current = document.hidden ? 30 : 60; };
     document.addEventListener("visibilitychange", onVis);
 
@@ -174,11 +165,9 @@ function ParticleRainBackground({
 
       const { w, h } = boundsRef.current;
 
-      // clear; keep CSS bg
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, w, h);
 
-      // additive blend for nice overlap
       ctx.globalCompositeOperation = "lighter";
 
       for (const p of particlesRef.current) {
@@ -245,27 +234,8 @@ const pair = (arr) => {
   return out;
 };
 
-const useReveal = (threshold = 0.22) => {
-  const ref = useRef(null);
-  const controls = useAnimation();
-  useEffect(() => {
-    const el = ref.current; if (!el) return;
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && controls.start("visible"), { threshold });
-    io.observe(el); return () => io.disconnect();
-  }, [controls, threshold]);
-  return { ref, controls };
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 26, filter: "blur(6px)" },
-  visible: (i) => ({
-    opacity: 1, y: 0, filter: "blur(0px)",
-    transition: { duration: 0.65, delay: 0.06 * i, ease: [0.22, 1, 0.36, 1] }
-  }),
-};
-
+/* === Glass Card (no scroll-triggered animations) === */
 function GlassCard({ side = "left", data }) {
-  const { ref, controls } = useReveal();
   const Icon = data.icon || Sparkles;
 
   const onMove = (e) => {
@@ -276,13 +246,8 @@ function GlassCard({ side = "left", data }) {
   };
 
   return (
-    <motion.article
-      ref={ref}
+    <article
       className={`pptr3-card ${side}`}
-      custom={side === "left" ? 0 : 1}
-      initial="hidden"
-      animate={controls}
-      variants={cardVariants}
       onMouseMove={onMove}
     >
       <div className="pptr3-top">
@@ -295,7 +260,7 @@ function GlassCard({ side = "left", data }) {
       </div>
       <p className="pptr3-desc">{data.description}</p>
       <span className="pptr3-blob" aria-hidden />
-    </motion.article>
+    </article>
   );
 }
 
@@ -309,7 +274,7 @@ const StepChip = ({ n }) => (
 export default function PremiumProcessTimeline() {
   const isMobile = useMediaQuery("(max-width: 820px)");
   const rows = pair(ITEMS);
-  const particleCount = isMobile ? 7 : 14;
+  const particleCount = isMobile ? 18 : 36;
 
   return (
     <section id="process" className={`pptr3-section section-with-particles ${isMobile ? "pptr3-mobile-mode" : ""}`}>
@@ -318,21 +283,21 @@ export default function PremiumProcessTimeline() {
         emit="both"
         count={particleCount}
         speed={isMobile ? [1, 1] : [1, 1]}
-        size={isMobile ? [0.001, 0.001] : [0.001, 0.001]}
-        opacity={isMobile ? 0.30 : 0.38}
-        wind={isMobile ? 1.2 : 1.6}
+        size={isMobile ? [0.4, 0.7] : [0.45, 0.9]}
+        opacity={isMobile ? 0.30 : 0.35}
+        wind={isMobile ? 0.6 : 1.0}
+        blur={4}
       />
 
       <div className="pptr3-wrap">
         <header className="pptr3-header">
-          <motion.h2 className="growth-heading" custom={0}>
+          <h2 className="growth-heading">
             The RoadHouse Process<br />
             <span>How We Scale Your Brand</span>
-          </motion.h2>
-
-          <motion.p className="growth-subtext" custom={1}>
+          </h2>
+          <p className="growth-subtext">
             We drive your growth and revenue by securing your ideal customers — and we handle the full complexity of modern marketing for you.
-          </motion.p>
+          </p>
         </header>
 
         {isMobile ? (
