@@ -36,11 +36,10 @@ const Contact = () => {
       return;
     }
 
-  if (formData.social.trim() !== '' && !validateURL(formData.social)) {
-  setError('Please enter a valid URL (e.g. https://example.com)');
-  return;
-}
-
+    if (!validateURL(formData.social)) {
+      setError('Please enter a valid URL (e.g. https://example.com)');
+      return;
+    }
 
     if (wordCount(formData.message) > 200) {
       setError('Message should not exceed 200 words.');
@@ -98,7 +97,7 @@ const Contact = () => {
           </div>
 
           <div className="form-group">
-            <input type="text" name="social" placeholder=" " value={formData.social} onChange={handleChange} />
+            <input type="text" name="social" required placeholder=" " value={formData.social} onChange={handleChange} />
             <label>Social account url</label>
           </div>
 
