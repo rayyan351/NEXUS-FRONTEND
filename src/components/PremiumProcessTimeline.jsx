@@ -20,14 +20,13 @@ function useMediaQuery(query) {
   return matches;
 }
 
-/* ============== Particle rain background (scoped) ============== */
-/* ============== Particle rain (top/bottom/both) without color wash ============== */
+/* ============== Particle rain (perf-optimized, colored sprites) ============== */
 function ParticleRainBackground({
   className = "",
   colors = ["#00aeef", "#a44de4"],
-  count = 36,            // total particles (split when emit="both")
+  count = 1,
   speed = [12, 22],
-  size = [1.0, 2.0],
+  size = [0.2, 0.2],
   blur = 10,
   opacity = 0.45,
   wind = 1.6,
@@ -38,9 +37,44 @@ function ParticleRainBackground({
   const particlesRef = React.useRef([]);
   const lastRef = React.useRef(performance.now());
   const boundsRef = React.useRef({ w: 0, h: 0 });
+  const visibleRef = React.useRef(true);
+  const fpsTargetRef = React.useRef(60);
+  const spriteCacheRef = React.useRef(new Map()); // color -> {canvas,size}
 
   const rand = (a,b)=> a + Math.random()*(b-a);
   const pick = (arr)=> arr[(Math.random()*arr.length)|0];
+
+  // pre-render a soft glow sprite ONCE per color (cached)
+  const makeSprite = React.useCallback((r = 2, b = 10, color = "#00aeef") => {
+    const pad = Math.ceil(b * 2.2);
+    const S = Math.ceil(r * 2 + pad * 2);
+    const c = document.createElement("canvas");
+    c.width = S; c.height = S;
+    const ctx = c.getContext("2d");
+    const cx = S / 2, cy = S / 2;
+
+    // colored radial glow
+    const g = ctx.createRadialGradient(cx, cy, r * 0.25, cx, cy, Math.max(r, b) + pad / 2);
+    g.addColorStop(0.0, color);
+    g.addColorStop(0.35, color);
+    g.addColorStop(1.0, "rgba(0,0,0,0)");
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(r, b) + pad / 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // colored core
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    return { canvas: c, size: S };
+  }, []);
 
   React.useEffect(() => {
     const host = hostRef.current;
@@ -54,11 +88,12 @@ function ParticleRainBackground({
     canvas.style.mixBlendMode = "normal";
     host.appendChild(canvas);
     const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
+    ctx.imageSmoothingEnabled = true;
 
     const seed = () => {
       const w = host.clientWidth || 1;
       const h = host.clientHeight || 1;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5); // cap DPR
       canvas.width = Math.floor(w * dpr);
       canvas.height = Math.floor(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -70,11 +105,9 @@ function ParticleRainBackground({
       const bottomCount = wantBottom && wantTop ? count - topCount : (wantBottom ? count : 0);
 
       const P = [];
-
-      // top → down
       for (let i = 0; i < topCount; i++) {
         P.push({
-          dir: 1,                          // +1 means falling down
+          dir: 1, // down
           x: Math.random()*w,
           y: rand(-h*0.25, 0),
           r: rand(size[0], size[1]),
@@ -84,11 +117,9 @@ function ParticleRainBackground({
           a: opacity * rand(0.7, 1)
         });
       }
-
-      // bottom → up
       for (let i = 0; i < bottomCount; i++) {
         P.push({
-          dir: -1,                         // -1 means rising up
+          dir: -1, // up
           x: Math.random()*w,
           y: rand(h, h*1.25),
           r: rand(size[0], size[1]),
@@ -98,54 +129,78 @@ function ParticleRainBackground({
           a: opacity * rand(0.7, 1)
         });
       }
-
       particlesRef.current = P;
+
+      // build colored sprites once per color
+      spriteCacheRef.current.clear();
+      colors.forEach(col => {
+        spriteCacheRef.current.set(
+          col,
+          makeSprite(Math.max(1.8, (size[0] + size[1]) * 0.3), blur, col)
+        );
+      });
     };
 
     const ro = new ResizeObserver(seed);
     ro.observe(host);
     seed();
 
+    // pause when section not visible
+    const io = new IntersectionObserver(([e]) => { visibleRef.current = !!e.isIntersecting; }, { threshold: 0.01 });
+    io.observe(host);
+
+    // lower fps when tab not focused
+    const onVis = () => { fpsTargetRef.current = document.hidden ? 30 : 60; };
+    document.addEventListener("visibilitychange", onVis);
+
     const prefersReduced =
       window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    let acc = 0;
     const tick = (t) => {
       const dt = Math.min(0.05, (t - lastRef.current)/1000);
       lastRef.current = t;
+
+      if (!visibleRef.current || prefersReduced) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      acc += dt;
+      const targetStep = 1 / fpsTargetRef.current;
+      if (acc < targetStep) { rafRef.current = requestAnimationFrame(tick); return; }
+      acc = 0;
+
       const { w, h } = boundsRef.current;
 
-      // hard-clear to exact brand bg
+      // clear; keep CSS bg
       ctx.globalCompositeOperation = "source-over";
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = "#0b1120";
-      ctx.fillRect(0, 0, w, h);
+      ctx.clearRect(0, 0, w, h);
 
-      // additive dots
+      // additive blend for nice overlap
       ctx.globalCompositeOperation = "lighter";
+
       for (const p of particlesRef.current) {
         p.y += p.dir * p.vy * dt * 60;
         p.x += p.vx * dt * 60;
 
-        // wrap on sides
         if (p.x < -20) p.x = w + 20;
         if (p.x > w + 20) p.x = -20;
 
-        // respawn from the correct side when off-screen
         if (p.dir === 1 && p.y - p.r > h) { p.y = -p.r; p.x = Math.random()*w; }
         if (p.dir === -1 && p.y + p.r < 0) { p.y = h + p.r; p.x = Math.random()*w; }
 
-        ctx.beginPath();
-        ctx.shadowBlur = blur;
-        ctx.shadowColor = p.c;
-        ctx.fillStyle = p.c;
-        ctx.globalAlpha = p.a;
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
-        ctx.fill();
+        const spr = spriteCacheRef.current.get(p.c);
+        if (spr) {
+          const S = spr.size;
+          const half = S / 2;
+          ctx.globalAlpha = p.a;
+          ctx.drawImage(spr.canvas, p.x - half, p.y - half, S, S);
+        }
       }
 
-      if (!prefersReduced) rafRef.current = requestAnimationFrame(tick);
+      rafRef.current = requestAnimationFrame(tick);
     };
 
     if (!prefersReduced) {
@@ -156,9 +211,12 @@ function ParticleRainBackground({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       ro.disconnect();
+      io.disconnect();
+      document.removeEventListener("visibilitychange", onVis);
       try { host.removeChild(canvas); } catch {}
     };
-  }, [colors, count, speed, size, blur, opacity, wind, emit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colors.join(","), count, speed[0], speed[1], size[0], size[1], blur, opacity, wind, emit]);
 
   return <div ref={hostRef} className={`particles-layer ${className}`} />;
 }
@@ -242,7 +300,6 @@ function GlassCard({ side = "left", data }) {
 }
 
 /* mobile step badge */
-/* centered mobile step chip */
 const StepChip = ({ n }) => (
   <div className="pptr3-stepchip pptr3-stepchip--center">
     <span>{String(n).padStart(2, "0")}</span>
@@ -252,51 +309,44 @@ const StepChip = ({ n }) => (
 export default function PremiumProcessTimeline() {
   const isMobile = useMediaQuery("(max-width: 820px)");
   const rows = pair(ITEMS);
-  const particleCount = isMobile ? 18 : 36;
+  const particleCount = isMobile ? 7 : 14;
 
   return (
     <section id="process" className={`pptr3-section section-with-particles ${isMobile ? "pptr3-mobile-mode" : ""}`}>
       <ParticleRainBackground
         colors={["#00aeef", "#a44de4"]}
-        emit="both"    
+        emit="both"
         count={particleCount}
         speed={isMobile ? [1, 1] : [1, 1]}
-        size={isMobile ? [0.9, 1.6] : [1.0, 2.0]}
-        opacity={isMobile ? 0.35 : 0.45}
+        size={isMobile ? [0.001, 0.001] : [0.001, 0.001]}
+        opacity={isMobile ? 0.30 : 0.38}
         wind={isMobile ? 1.2 : 1.6}
       />
 
       <div className="pptr3-wrap">
         <header className="pptr3-header">
           <motion.h2 className="growth-heading" custom={0}>
-          The RoadHouse Process<br />
-          <span>How We Scale Your Brand</span>
-        </motion.h2>
+            The RoadHouse Process<br />
+            <span>How We Scale Your Brand</span>
+          </motion.h2>
 
-         <motion.p className="growth-subtext" custom={1}>
-     We drive your growth and revenue by securing your ideal customers — and we handle the full complexity of modern marketing for you.
-        </motion.p>
+          <motion.p className="growth-subtext" custom={1}>
+            We drive your growth and revenue by securing your ideal customers — and we handle the full complexity of modern marketing for you.
+          </motion.p>
         </header>
 
         {isMobile ? (
-          // --- MOBILE: Center rail, step → card → step → card ---
           <div className="pptr3-mobile-rail">
             {ITEMS.map((item, i) => (
               <div className="pptr3-mrow" key={i}>
-                {/* step chip centered on the rail */}
                 <StepChip n={i + 1} />
-
-                {/* connector line from chip to card */}
                 <div className="pptr3-mrow-connector" aria-hidden />
-
-                {/* full-width card */}
                 <GlassCard side="mobile" data={item} />
               </div>
             ))}
           </div>
         ) : (
           <>
-            {/* DESKTOP timeline unchanged */}
             <div className="pptr3-spine" aria-hidden />
             <div className="pptr3-grid">
               {rows.map((pr, rIndex) => {
@@ -332,4 +382,3 @@ export default function PremiumProcessTimeline() {
     </section>
   );
 }
-
