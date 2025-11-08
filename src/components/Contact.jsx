@@ -19,7 +19,7 @@ const Contact = () => {
   const [error, setError] = useState('');
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const validateURL = (url) => /^https?:\/\/[\w.-]+(?:\.[\w\.-]+)+[\w\-._~:/?#[\]@!$&'()*+,;=]+$/.test(url);
+  const validateURL = (url) => /^https?:\/\/[\w.-]+(?:\.[\w.-]+)+[\w\-._~:/?#[\]@!$&'()*+,;=]+$/.test(url);
   const wordCount = (text) => text.trim().split(/\s+/).length;
 
   const handleChange = (e) => {
@@ -50,7 +50,7 @@ const Contact = () => {
     setSubmitted(false);
 
     try {
-      await axios.post('https://nexus-backend-7j52.onrender.com/api/contact', formData);
+      await axios.post('http://localhost:5000/api/contact', formData);
       setSubmitted(true);
       setFormData({ name: '', email: '', social: '', message: '' });
 

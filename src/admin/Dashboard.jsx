@@ -69,7 +69,7 @@ const Dashboard = () => {
   const [deletedBackup, setDeletedBackup] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
-  const [fadeCard, setFadeCard] = useState(null);
+  const [, setFadeCard] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState('');
   const [undoTimer, setUndoTimer] = useState(5);

@@ -29,14 +29,14 @@ const THEMED_GLOBE_CONFIG = {
 };
 
 export default function Globe({ config = THEMED_GLOBE_CONFIG }) {
-  let phi = 0;
-  const [width, setWidth] = useState(0); // ✅ reactive width
+  const phiRef = useRef(0); // ✅ persistent phi
+  const [width, setWidth] = useState(0);
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const pointerInteracting = useRef(null);
   const pointerInteractionMovement = useRef(0);
   const [r, setR] = useState(0);
-  const globeRef = useRef(null); // 🌐 to destroy on resize
+  const globeRef = useRef(null);
 
   const updatePointerInteraction = (value) => {
     pointerInteracting.current = value;
@@ -55,8 +55,10 @@ export default function Globe({ config = THEMED_GLOBE_CONFIG }) {
 
   const onRender = useCallback(
     (state) => {
-      if (!pointerInteracting.current) phi += 0.005;
-      state.phi = phi + r;
+      if (!pointerInteracting.current) {
+        phiRef.current += 0.005; // ✅ mutate ref safely
+      }
+      state.phi = phiRef.current + r;
       state.width = width * 2;
       state.height = width * 2;
     },
@@ -93,7 +95,7 @@ export default function Globe({ config = THEMED_GLOBE_CONFIG }) {
     });
 
     return () => globeRef.current?.destroy();
-  }, [width, onRender]);
+  }, [width, onRender, config]);
 
   return (
     <div ref={containerRef} className="globe-container">

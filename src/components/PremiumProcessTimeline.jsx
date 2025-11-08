@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useMemo } from "react";
-import { motion } from "framer-motion"; // kept in case you use elsewhere; not required for cards now
+import React, { useEffect, useMemo } from "react";
 import {
   Target, Heart, Lightbulb, Globe, Zap, TrendingUp, Users, Mail,
   Sparkles, DollarSign, Clock, ArrowUpRight, LineChart, Rocket
