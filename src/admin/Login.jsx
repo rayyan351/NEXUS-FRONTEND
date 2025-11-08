@@ -17,7 +17,7 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.post('https://nexus-backend-1-qjsa.onrender.com/api/admin/login', form);
+      const res = await axios.post('https://nexus-backend-7j52.onrender.com/api/admin/login', form);
       login(res.data);
       navigate('/admin/dashboard');
     } catch (err) {

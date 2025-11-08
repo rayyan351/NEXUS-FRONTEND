@@ -38,7 +38,7 @@ const flushPendingDeletes = async (token) => {
   if (!items.length || !token) return;
   for (const { id } of items) {
     try {
-      await axios.delete(`https://nexus-backend-1-qjsa.onrender.com/api/admin/submissions/${id}`, {
+      await axios.delete(`https://nexus-backend-7j52.onrender.com/api/admin/submissions/${id}`, {
         headers: { 'x-auth-token': token }
       });
       removePendingDelete(id);
@@ -146,7 +146,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchSubs = async () => {
       try {
-        const res = await axios.get('https://nexus-backend-1-qjsa.onrender.com/api/admin/submissions', {
+        const res = await axios.get('https://nexus-backend-7j52.onrender.com/api/admin/submissions', {
           headers: {
             'x-auth-token': admin.token
           }
